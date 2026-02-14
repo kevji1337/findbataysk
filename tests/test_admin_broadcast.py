@@ -9,6 +9,13 @@ from bot.handlers import admin as admin_handler
 @pytest.mark.asyncio
 async def test_admin_broadcast_send_rejects_non_admin(monkeypatch):
     monkeypatch.setattr(type(admin_handler.settings), "is_admin", lambda _self, _uid: False)
+    
+    # Мокаем репозиторий, чтобы не лез в БД, даже если проверка админа сломается
+    monkeypatch.setattr(
+        admin_handler.UserRepository,
+        "get_broadcast_telegram_ids",
+        AsyncMock(return_value=[])
+    )
 
     clear = AsyncMock()
     state = SimpleNamespace(clear=clear)

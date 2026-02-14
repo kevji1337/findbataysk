@@ -35,6 +35,9 @@ async def test_cmd_start_new_user():
         # Настраиваем поведение моков
         MockSettings.is_admin.return_value = False  # Юзер не админ
         MockPhotoPath.exists.return_value = True    # Файл фото якобы существует
+        
+        # Важно: get_or_create асинхронный, поэтому нужен AsyncMock
+        MockUserRepo.get_or_create = AsyncMock()
 
         # 3. Вызов тестируемой функции
         await cmd_start(message, state)
@@ -52,18 +55,24 @@ async def test_cmd_start_new_user():
         )
 
         # Проверяем, что было отправлено фото (так как WELCOME_PHOTO.exists() == True)
-        message.answer_photo.assert_awaited_once()
+        # message.answer_photo - это AsyncMock, так что await_count работает
+        assert message.answer_photo.await_count == 1
         
         # Получаем аргументы вызова отправки фото
-        args, kwargs = message.answer_photo.call_args
-        assert kwargs["caption"] is not None # Убеждаемся, что есть текст
-        assert kwargs["reply_markup"] is not None # Убеждаемся, что есть клавиатура
+        # call_args возвращает (args, kwargs) последнего вызова
+        if message.answer_photo.call_args:
+            args, kwargs = message.answer_photo.call_args
+            assert kwargs.get("caption") is not None # Убеждаемся, что есть текст
+            assert kwargs.get("reply_markup") is not None # Убеждаемся, что есть клавиатура
 
 @pytest.mark.asyncio
 async def test_cmd_start_no_photo():
     """Проверка /start, если фото приветствия отсутствует."""
     message = AsyncMock(spec=types.Message)
+    message.from_user = MagicMock(spec=types.User)
     message.from_user.id = 12345
+    message.from_user.username = "test"
+    message.from_user.first_name = "Test"
     message.answer_photo = AsyncMock()
     message.answer = AsyncMock()
     state = AsyncMock(spec=FSMContext)

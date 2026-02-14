@@ -64,6 +64,8 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
+from bot.core.formatting import format_user_model
+
 @router.callback_query(lambda c: c.data == "admin_top_referrers")
 async def show_top_referrers(callback: types.CallbackQuery) -> None:
     """Показать топ рефереров."""
@@ -75,8 +77,7 @@ async def show_top_referrers(callback: types.CallbackQuery) -> None:
         lines = ["📊 <b>Топ рефереров</b>\n"]
         for i, (user, count) in enumerate(top_referrers, 1):
             medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
-            username = f"@{user.username}" if user.username else f"ID:{user.telegram_id}"
-            lines.append(f"{medal} {username} — <b>{count}</b> чел.")
+            lines.append(f"{medal} {format_user_model(user)} — <b>{count}</b> чел.")
         text = "\n".join(lines)
 
     try:
@@ -109,13 +110,10 @@ async def show_requests_history(callback: types.CallbackQuery) -> None:
                 "rejected": "❌",
             }.get(req.status, "❓")
 
-            username = f"@{user.username}" if user.username else f"ID:{user.telegram_id}"
-            date_str = req.created_at.strftime("%d.%m %H:%M")
-
             lines.append(
-                f"{status_emoji} {username}\n"
+                f"{status_emoji} {format_user_model(user)}\n"
                 f"   📎 {req.channel_link}\n"
-                f"   📅 {date_str}"
+                f"   📅 {req.created_at.strftime('%d.%m %H:%M')}"
             )
         text = "\n\n".join(lines)
 

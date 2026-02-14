@@ -4,7 +4,7 @@ from aiogram import Router, types
 from aiogram.exceptions import TelegramBadRequest
 from loguru import logger
 
-from bot.database.models import User
+from bot.core.formatting import format_user_model
 from bot.database.repository import ReferralStatsRepository
 from bot.keyboards.inline import get_leaderboard_keyboard
 
@@ -31,15 +31,6 @@ def _is_message_not_modified_error(exc: TelegramBadRequest) -> bool:
     return "message is not modified" in str(exc).lower()
 
 
-
-
-def _format_user_display(user: User) -> str:
-    """Сформировать отображаемое имя пользователя для лидерборда."""
-    if user.username:
-        return f"@{user.username}"
-    if user.first_name:
-        return f"{user.first_name} (ID:{user.telegram_id})"
-    return f"ID:{user.telegram_id}"
 
 
 async def _render_leaderboard(
@@ -72,7 +63,7 @@ async def _render_leaderboard(
                 else "🥉" if index == 3
                 else f"{index}."
             )
-            display = _format_user_display(user)
+            display = format_user_model(user)
             lines.append(f"{medal} {display} — <b>{total}</b> приглашений")
 
         lines.append(

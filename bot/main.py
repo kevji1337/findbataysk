@@ -1,5 +1,5 @@
 ﻿import asyncio
-import signal
+
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -11,6 +11,7 @@ from bot.config import settings
 from bot.handlers import admin, admin_contact, advertising, leaderboard, referral, start
 from bot.middlewares.rate_limit import rate_limiter
 from bot.services.broadcast_worker import BroadcastWorker
+
 
 
 async def main() -> None:
@@ -25,9 +26,11 @@ async def main() -> None:
     storage = RedisStorage.from_url(settings.redis_url)
     dp = Dispatcher(storage=storage)
 
+    # Middlewares
     dp.message.middleware(rate_limiter)
     dp.callback_query.middleware(rate_limiter)
 
+    # Routers
     dp.include_router(start.router)
     dp.include_router(referral.router)
     dp.include_router(advertising.router)
@@ -35,39 +38,38 @@ async def main() -> None:
     dp.include_router(leaderboard.router)
     dp.include_router(admin.router)
 
-    broadcast_worker = BroadcastWorker(
-        bot=bot,
-        poll_interval_seconds=settings.broadcast_worker_poll_seconds,
-    )
-    await broadcast_worker.start()
+    # Startup / Shutdown logic
+    async def on_startup(dispatcher: Dispatcher) -> None:
+        logger.info("Starting broadcast worker...")
+        worker = BroadcastWorker(
+            bot=bot,
+            poll_interval_seconds=settings.broadcast_worker_poll_seconds,
+        )
+        await worker.start()
+        # Сохраняем worker в workflow_data, чтобы достать при shutdown
+        dispatcher["broadcast_worker"] = worker
+        
+        logger.info("Bot started")
+        logger.info(f"Configured admins: {len(settings.admin_ids)}")
 
-    async def on_shutdown() -> None:
+    async def on_shutdown(dispatcher: Dispatcher) -> None:
         logger.info("Bot shutdown...")
-        await broadcast_worker.stop()
+        worker: BroadcastWorker | None = dispatcher.get("broadcast_worker")
+        if worker:
+            await worker.stop()
+        
         await storage.close()
         await bot.session.close()
         logger.info("Bot stopped")
 
-    loop = asyncio.get_event_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(on_shutdown()))
-        except NotImplementedError:
-            pass
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
 
-    logger.info("Bot started")
-    logger.info(f"Configured admins: {len(settings.admin_ids)}")
-
-    try:
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await on_shutdown()
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Bot stopped by Ctrl+C")
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped by signal")

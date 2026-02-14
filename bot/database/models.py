@@ -175,7 +175,6 @@ class AdminActionLog(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
-# Создание движка и сессии
 class BroadcastJob(Base):
     """Background broadcast job with persisted progress."""
 

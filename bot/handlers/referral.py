@@ -7,7 +7,7 @@ from bot.config import settings
 from bot.core.constants import REFERRALS_PER_GIFT
 from bot.core.referral_service import calculate_gift_stats, get_gift_word
 from bot.database.repository import ReferralRepository, UserRepository
-from bot.keyboards.inline import get_back_to_menu_keyboard
+from bot.keyboards.inline import get_back_to_menu_keyboard, get_referral_keyboard
 from bot.services.admin_notify import notify_admin_new_referral_link, notify_user_new_referral
 from bot.services.referral_abuse import inspect_join_event, inspect_leave_event
 from bot.services.referral_events import handle_referral_join, handle_referral_leave
@@ -48,8 +48,6 @@ async def referral_program(callback: types.CallbackQuery, bot: Bot) -> None:
             status_text = f"⏳ До следующего подарка: <b>{stats.until_next}</b> переходов"
         
         # Отправляем существующую ссылку
-        from bot.keyboards.inline import get_referral_keyboard
-        from bot.core.constants import REFERRALS_PER_GIFT
         await callback.message.answer(
             text=(
                 f"🔗 <b>Ваша реферальная ссылка:</b>\n\n"
@@ -170,7 +168,7 @@ async def on_chat_member_update(event: ChatMemberUpdated, bot: Bot) -> None:
 
             if referral_link_id and decremented:
                 logger.info(
-                    f"Реферал {user_id} вышел из канала, счётчик умеьшен"
+                    f"Реферал {user_id} вышел из канала, счётчик уменьшен"
                 )
 
 

@@ -1,15 +1,16 @@
 ﻿from aiogram import Bot
 
+from bot.core.constants import (
+    FLAG_COOLDOWN_MIN,
+    JOIN_SPIKE_THRESHOLD,
+    JOIN_SPIKE_WINDOW_MIN,
+    LEAVE_SPIKE_THRESHOLD,
+    LEAVE_SPIKE_WINDOW_MIN,
+    REJOIN_THRESHOLD,
+    REJOIN_WINDOW_MIN,
+)
 from bot.database.repository import ReferralAbuseRepository
 from bot.services.admin_notify import notify_admin_abuse_flag
-
-JOIN_SPIKE_WINDOW_MIN = 5
-JOIN_SPIKE_THRESHOLD = 8
-LEAVE_SPIKE_WINDOW_MIN = 5
-LEAVE_SPIKE_THRESHOLD = 5
-REJOIN_WINDOW_MIN = 60
-REJOIN_THRESHOLD = 3
-FLAG_COOLDOWN_MIN = 30
 
 
 async def inspect_join_event(

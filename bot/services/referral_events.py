@@ -13,7 +13,7 @@ from bot.database.models import (
     User,
 )
 from bot.database.session import get_session
-from bot.services.leaderboard_cache import invalidate_leaderboard_cache
+
 
 
 async def _increment_daily_stat(
@@ -125,7 +125,7 @@ async def handle_referral_join(
                 stat_date=now.date(),
             )
             counted = True
-            invalidate_leaderboard_cache()
+
         else:
             event = await session.scalar(
                 select(ReferralEvent).where(ReferralEvent.telegram_id == telegram_id)
@@ -197,7 +197,7 @@ async def handle_referral_leave(telegram_id: int) -> Tuple[Optional[int], bool]:
                 referral_link_id=referral_link_id,
                 action="leave",
             )
-            invalidate_leaderboard_cache()
+
             return referral_link_id, True
 
         # 2) Событие есть, но не должно уменьшать счетчик (уже было вычтено ранее).

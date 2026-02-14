@@ -1,10 +1,4 @@
-﻿"""
-Фасад-модуль: сохраняет обратную совместимость импортов.
-
-Все репозитории разнесены по файлам в bot/database/repositories/.
-Этот файл реэкспортирует их, чтобы существующий код
-`from bot.database.repository import UserRepository` продолжал работать.
-"""
+"""Репозитории базы данных — разбиты по доменам."""
 
 from bot.database.repositories.user_repo import UserRepository
 from bot.database.repositories.referral_repo import ReferralRepository

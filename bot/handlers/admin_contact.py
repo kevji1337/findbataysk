@@ -11,8 +11,9 @@ router = Router(name="admin_contact")
 @router.callback_query(lambda c: c.data == "admin_contact")
 async def admin_contact(callback: types.CallbackQuery) -> None:
     """Показать контактную информацию администрации."""
-    # Формируем ссылку на ЛС админа
-    admin_link = f"tg://user?id={settings.admin_id}"
+    # Формируем ссылку на ЛС главного админа
+    main_admin_id = settings.admin_ids[0] if settings.admin_ids else 0
+    admin_link = f"tg://user?id={main_admin_id}"
     
     # Клавиатура с кнопкой-ссылкой на админа
     keyboard = InlineKeyboardMarkup(

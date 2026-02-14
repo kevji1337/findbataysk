@@ -10,11 +10,15 @@ class AdRequestStatus:
     REJECTED = "rejected"
 
 
-# Обратная совместимость с тестами/старым кодом:
-# ранее класс мог называться RequestStatus.
-class RequestStatus(AdRequestStatus):
-    """Алиас для AdRequestStatus для совместимости."""
-
 # Rate limiting
 MAX_AD_REQUESTS_PER_HOUR = 3
 MAX_MESSAGES_PER_MINUTE = 30
+
+# Антиабьюз
+JOIN_SPIKE_WINDOW_MIN = 5
+JOIN_SPIKE_THRESHOLD = 8
+LEAVE_SPIKE_WINDOW_MIN = 5
+LEAVE_SPIKE_THRESHOLD = 5
+REJOIN_WINDOW_MIN = 60
+REJOIN_THRESHOLD = 3
+FLAG_COOLDOWN_MIN = 30

@@ -1,1 +1,0 @@
-"""FSM Storage модули (Redis)."""

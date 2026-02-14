@@ -116,6 +116,7 @@ docker stats
 
 ## Troubleshooting
 
+
 ### Бот не запускается
 ```bash
 docker compose logs bot
@@ -125,19 +126,17 @@ docker compose logs bot
 - Бот добавлен как админ в канал?
 - `CHANNEL_ID` начинается с `-100`?
 
-### Миграции падают
-```bash
-# Посмотреть ошибку
-docker compose logs bot | grep -A5 "migrations"
-
-# Зайти в контейнер вручную
-docker compose exec bot bash
-alembic current
-alembic upgrade head
-```
-
 ### БД не запускается
+База данных работает в отельном стеке Supabase. Проверьте статус контейнеров Supabase:
 ```bash
-docker compose logs db
+docker ps | grep supabase
 ```
-Проверь: хватает ли места на диске (`df -h`).
+
+## 🔐 Безопасность
+
+**Критически важно:**
+1. Никогда не коммитить `.env` файл.
+2. Регулярно обновлять `BOT_TOKEN` через @BotFather, если есть подозрение на утечку.
+3. Использовать сложные пароли для `POSTGRES_PASSWORD`.
+4. Бэкапы базы данных хранить в безопасном месте, не в web-root.
+

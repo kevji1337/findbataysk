@@ -18,23 +18,20 @@ from bot.keyboards.inline import (
     get_admin_panel_keyboard,
     get_back_to_admin_keyboard,
     get_cancel_keyboard,
+    get_requests_filter_keyboard,
 )
 from bot.states.admin_broadcast import AdminBroadcastStates
 
 router = Router(name="admin")
 
+# ── Фильтр: ВСЕ хендлеры этого роутера доступны только админам ──
+router.message.filter(lambda msg: settings.is_admin(msg.from_user.id))
+router.callback_query.filter(lambda cb: settings.is_admin(cb.from_user.id))
 
-@router.message(Command("admin"))
-async def admin_panel(message: types.Message) -> None:
-    """Показать админ-панель."""
-    if not settings.is_admin(message.from_user.id):
-        await message.answer("⛔ Доступ запрещён")
-        return
 
-    stats = await ReferralStatsRepository.get_total_stats()
-    pending_count = await AdvertisingRepository.get_pending_count()
-
-    text = (
+def _get_admin_panel_text(stats: dict, pending_count: int) -> str:
+    """Сформировать текст админ-панели."""
+    return (
         "🔐 <b>Админ-панель</b>\n\n"
         f"👥 Всего пользователей: <b>{stats['users_count']}</b>\n"
         f"🔗 Реферальных ссылок: <b>{stats['links_count']}</b>\n"
@@ -42,26 +39,22 @@ async def admin_panel(message: types.Message) -> None:
         f"📋 Заявок на рекламу ожидает: <b>{pending_count}</b>"
     )
 
+
+@router.message(Command("admin"))
+async def admin_panel(message: types.Message) -> None:
+    """Показать админ-панель."""
+    stats = await ReferralStatsRepository.get_total_stats()
+    pending_count = await AdvertisingRepository.get_pending_count()
+    text = _get_admin_panel_text(stats, pending_count)
     await message.answer(text, reply_markup=get_admin_panel_keyboard())
 
 
 @router.callback_query(lambda c: c.data == "admin_panel")
 async def admin_panel_callback(callback: types.CallbackQuery) -> None:
     """Показать админ-панель (callback)."""
-    if not settings.is_admin(callback.from_user.id):
-        await callback.answer("⛔ Доступ запрещён", show_alert=True)
-        return
-
     stats = await ReferralStatsRepository.get_total_stats()
     pending_count = await AdvertisingRepository.get_pending_count()
-
-    text = (
-        "🔐 <b>Админ-панель</b>\n\n"
-        f"👥 Всего пользователей: <b>{stats['users_count']}</b>\n"
-        f"🔗 Реферальных ссылок: <b>{stats['links_count']}</b>\n"
-        f"➡️ Всего переходов: <b>{stats['total_referrals']}</b>\n\n"
-        f"📋 Заявок на рекламу ожидает: <b>{pending_count}</b>"
-    )
+    text = _get_admin_panel_text(stats, pending_count)
 
     try:
         await callback.message.edit_text(text, reply_markup=get_admin_panel_keyboard())
@@ -74,10 +67,6 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
 @router.callback_query(lambda c: c.data == "admin_top_referrers")
 async def show_top_referrers(callback: types.CallbackQuery) -> None:
     """Показать топ рефереров."""
-    if not settings.is_admin(callback.from_user.id):
-        await callback.answer("⛔ Доступ запрещён", show_alert=True)
-        return
-
     top_referrers = await ReferralStatsRepository.get_top_referrers(limit=10)
 
     if not top_referrers:
@@ -101,10 +90,6 @@ async def show_top_referrers(callback: types.CallbackQuery) -> None:
 @router.callback_query(lambda c: c.data.startswith("admin_requests:"))
 async def show_requests_history(callback: types.CallbackQuery) -> None:
     """Показать историю заявок на рекламу."""
-    if not settings.is_admin(callback.from_user.id):
-        await callback.answer("⛔ Доступ запрещён", show_alert=True)
-        return
-
     _, filter_type = callback.data.split(":")
     status_filter = None if filter_type == "all" else filter_type
 
@@ -134,8 +119,6 @@ async def show_requests_history(callback: types.CallbackQuery) -> None:
             )
         text = "\n\n".join(lines)
 
-    from bot.keyboards.inline import get_requests_filter_keyboard
-
     try:
         await callback.message.edit_text(
             text,
@@ -151,10 +134,6 @@ async def show_requests_history(callback: types.CallbackQuery) -> None:
 @router.callback_query(lambda c: c.data == "admin_broadcast")
 async def admin_broadcast_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Запуск админ-рассылки из главного меню."""
-    if not settings.is_admin(callback.from_user.id):
-        await callback.answer("⛔ Доступ запрещён", show_alert=True)
-        return
-
     await state.set_state(AdminBroadcastStates.waiting_message)
 
     text = (
@@ -172,11 +151,6 @@ async def admin_broadcast_start(callback: types.CallbackQuery, state: FSMContext
 @router.message(AdminBroadcastStates.waiting_message)
 async def admin_broadcast_send(message: types.Message, state: FSMContext, bot: Bot) -> None:
     """Поставить сообщение в очередь фоновой рассылки."""
-    if not settings.is_admin(message.from_user.id):
-        await state.clear()
-        await message.answer("⛔ Доступ запрещён")
-        return
-
     user_ids = await UserRepository.get_broadcast_telegram_ids()
     if not user_ids:
         await state.clear()

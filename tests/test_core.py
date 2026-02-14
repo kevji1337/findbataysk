@@ -8,7 +8,7 @@ import pytest
 
 from bot.core.constants import (
     REFERRALS_PER_GIFT,
-    RequestStatus,
+    AdRequestStatus,
 )
 from bot.core.referral_service import (
     GiftStats,
@@ -24,11 +24,11 @@ class TestConstants:
         """REFERRALS_PER_GIFT должен быть положительным."""
         assert REFERRALS_PER_GIFT > 0
     
-    def test_request_status_values(self):
-        """RequestStatus должен иметь все нужные статусы."""
-        assert RequestStatus.PENDING == "pending"
-        assert RequestStatus.APPROVED == "approved"
-        assert RequestStatus.REJECTED == "rejected"
+    def test_ad_request_status_values(self):
+        """AdRequestStatus должен иметь все нужные статусы."""
+        assert AdRequestStatus.PENDING == "pending"
+        assert AdRequestStatus.APPROVED == "approved"
+        assert AdRequestStatus.REJECTED == "rejected"
 
 
 class TestGiftStats:

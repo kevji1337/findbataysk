@@ -15,30 +15,27 @@ class Settings(BaseSettings):
 
     bot_token: str
     channel_id: int
-    
+
     # Сырое значение из окружения, например "111,222,333".
-    # Парсим вручную, чтобы не зависеть от JSON-формата.
     admin_ids_env: Optional[str] = Field(
         default=None,
         alias="ADMIN_IDS",
         description="Raw ADMIN_IDS env string, e.g. '111,222,333'",
     )
 
-    # Нормализованный список админов (используется в коде)
-    # Алиас задаём так, чтобы окружение его не подхватывало напрямую.
+    # Нормализованный список админов
     admin_ids: List[int] = Field(default_factory=list, alias="__ADMIN_IDS_INTERNAL")
-    
-    # Для обратной совместимости (deprecated)
+
+    # Legacy (deprecated) — оставлен для обратной совместимости с .env
     admin_id: int = 0
-    
+
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
-    leaderboard_cache_ttl_seconds: float = 30.0
     redis_url: str = "redis://localhost:6379/0"
     broadcast_throttle_seconds: float = 0.05
     broadcast_max_retries: int = 3
     broadcast_worker_poll_seconds: float = 1.0
 
-    # Критерии для рекламы (можно переопределить в .env)
+    # Критерии для рекламы
     ad_criteria: str = """📋 Минимальные критерии для рекламы в Вашем ТГК:
 
 • Минимум 50 подписчиков
@@ -48,10 +45,6 @@ class Settings(BaseSettings):
     @field_validator("admin_ids_env", mode="before")
     @classmethod
     def ensure_str(cls, v: Union[str, List[int], int, None]) -> Optional[str]:
-        """
-        Приводим ADMIN_IDS к строке, чтобы избежать JSON-парсинга
-        вида "111,222,333" как complex value.
-        """
         if v is None:
             return None
         if isinstance(v, str):
@@ -64,7 +57,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def build_admin_ids(self) -> "Settings":
-        """Собираем финальный список admin_ids из admin_ids_env и admin_id."""
+        """Собираем финальный список admin_ids."""
         ids: List[int] = []
 
         raw = self.admin_ids_env
@@ -76,7 +69,6 @@ class Settings(BaseSettings):
                 try:
                     ids.append(int(part))
                 except ValueError:
-                    # Игнорируем некорректные значения
                     continue
 
         # Обратная совместимость: legacy ADMIN_ID
@@ -85,7 +77,7 @@ class Settings(BaseSettings):
 
         self.admin_ids = ids
 
-        # Если список не пуст, первый — главный админ
+        # Sync legacy field
         if self.admin_ids and not self.admin_id:
             self.admin_id = self.admin_ids[0]
 

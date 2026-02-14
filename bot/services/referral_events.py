@@ -90,7 +90,7 @@ async def handle_referral_join(
         if not referral_link:
             return None, False, None
 
-        now = datetime.now(UTC)
+        now = datetime.now(UTC).replace(tzinfo=None)
         counted = False
 
         insert_stmt = (
@@ -159,7 +159,7 @@ async def handle_referral_leave(telegram_id: int) -> Tuple[Optional[int], bool]:
         (referral_link_id, decremented)
     """
     async with get_session() as session:
-        now = datetime.now(UTC)
+        now = datetime.now(UTC).replace(tzinfo=None)
         # 1) Основной кейс: активный counted-реферал уходит.
         #    Обновляем событие атомарно; только один конкурентный вызов сможет пройти.
         counted_result = await session.execute(

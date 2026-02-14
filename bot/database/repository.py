@@ -345,7 +345,7 @@ class AdvertisingRepository:
             from sqlalchemy import func
             from datetime import timedelta
             
-            cutoff = datetime.now(UTC) - timedelta(hours=hours)
+            cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
             result = await session.execute(
                 select(func.count(AdvertisingRequest.id))
                 .where(AdvertisingRequest.user_id == user_id)
@@ -407,7 +407,7 @@ class ReferralStatsRepository:
             # Р”Р»СЏ РІСЃРµРіРѕ РІСЂРµРјРµРЅРё РґРѕСЃС‚Р°С‚РѕС‡РЅРѕ Р°РіСЂРµРіР°С‚Р° РїРѕ ReferralLink
             return await ReferralStatsRepository.get_top_referrers(limit=limit)
 
-        now = datetime.now(UTC)
+        now = datetime.now(UTC).replace(tzinfo=None)
         if period == "day":
             since = now - timedelta(days=1)
         elif period == "week":

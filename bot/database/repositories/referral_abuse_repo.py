@@ -5,10 +5,10 @@ from typing import Optional
 
 from sqlalchemy import func, select
 
+from bot.database import models
 from bot.database.models import (
     ReferralAbuseFlag,
     ReferralActivityLog,
-    async_session,
 )
 
 
@@ -22,7 +22,7 @@ class ReferralAbuseRepository:
         action: str,
         is_rejoin: bool = False,
     ) -> None:
-        async with async_session() as session:
+        async with models.async_session() as session:
             session.add(
                 ReferralActivityLog(
                     telegram_id=telegram_id,
@@ -40,7 +40,7 @@ class ReferralAbuseRepository:
         window_minutes: int,
     ) -> int:
         cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=window_minutes)
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(func.count(ReferralActivityLog.id))
                 .where(ReferralActivityLog.referral_link_id == referral_link_id)
@@ -52,7 +52,7 @@ class ReferralAbuseRepository:
     @staticmethod
     async def count_recent_user_rejoins(telegram_id: int, window_minutes: int) -> int:
         cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=window_minutes)
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(func.count(ReferralActivityLog.id))
                 .where(ReferralActivityLog.telegram_id == telegram_id)
@@ -71,7 +71,7 @@ class ReferralAbuseRepository:
         cooldown_minutes: int = 30,
     ) -> bool:
         cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=cooldown_minutes)
-        async with async_session() as session:
+        async with models.async_session() as session:
             existing = await session.scalar(
                 select(ReferralAbuseFlag.id)
                 .where(ReferralAbuseFlag.flag_type == flag_type)

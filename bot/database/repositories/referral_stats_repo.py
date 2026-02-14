@@ -5,12 +5,12 @@ from typing import Optional
 
 from sqlalchemy import func, select
 
+from bot.database import models
 from bot.database.models import (
     ReferralDailyStat,
     ReferralEvent,
     ReferralLink,
     User,
-    async_session,
 )
 
 
@@ -20,7 +20,7 @@ class ReferralStatsRepository:
     @staticmethod
     async def get_top_referrers(limit: int = 10) -> list[tuple[User, int]]:
         """Получить топ пользователей по количеству рефералов."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             totals_subq = (
                 select(
                     ReferralLink.user_id.label("user_id"),
@@ -69,7 +69,7 @@ class ReferralStatsRepository:
         else:
             return await ReferralStatsRepository.get_top_referrers(limit=limit)
 
-        async with async_session() as session:
+        async with models.async_session() as session:
             # Быстрый путь: дневные предагрегации
             period_subq = (
                 select(
@@ -121,7 +121,7 @@ class ReferralStatsRepository:
     @staticmethod
     async def get_total_stats() -> dict:
         """Получить общую статистику по рефералам."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             users_count = await session.execute(select(func.count(User.id)))
             users_count = users_count.scalar() or 0
 

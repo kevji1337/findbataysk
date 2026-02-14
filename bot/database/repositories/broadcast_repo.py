@@ -5,7 +5,8 @@ from typing import Optional
 
 from sqlalchemy import select, update
 
-from bot.database.models import BroadcastJob, async_session
+from bot.database import models
+from bot.database.models import BroadcastJob
 
 
 class BroadcastJobRepository:
@@ -21,7 +22,7 @@ class BroadcastJobRepository:
         throttle_seconds: float = 0.05,
         max_retries: int = 3,
     ) -> BroadcastJob:
-        async with async_session() as session:
+        async with models.async_session() as session:
             job = BroadcastJob(
                 created_by_admin_id=admin_telegram_id,
                 source_chat_id=source_chat_id,
@@ -38,7 +39,7 @@ class BroadcastJobRepository:
 
     @staticmethod
     async def get_by_id(job_id: int) -> Optional[BroadcastJob]:
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(BroadcastJob).where(BroadcastJob.id == job_id)
             )
@@ -47,7 +48,7 @@ class BroadcastJobRepository:
     @staticmethod
     async def acquire_next_pending() -> Optional[BroadcastJob]:
         """Взять ближайшую pending-задачу и перевести в processing."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             job = await session.scalar(
                 select(BroadcastJob)
                 .where(BroadcastJob.status == "pending")
@@ -76,7 +77,7 @@ class BroadcastJobRepository:
         blocked_delta: int = 0,
         failed_delta: int = 0,
     ) -> None:
-        async with async_session() as session:
+        async with models.async_session() as session:
             await session.execute(
                 update(BroadcastJob)
                 .where(BroadcastJob.id == job_id)
@@ -91,7 +92,7 @@ class BroadcastJobRepository:
 
     @staticmethod
     async def mark_done(job_id: int) -> None:
-        async with async_session() as session:
+        async with models.async_session() as session:
             await session.execute(
                 update(BroadcastJob)
                 .where(BroadcastJob.id == job_id)
@@ -105,7 +106,7 @@ class BroadcastJobRepository:
     @staticmethod
     async def mark_retry_or_failed(job_id: int, error_text: str) -> None:
         """Увеличить retry_count и пометить failed, если лимит превышен."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             job = await session.scalar(
                 select(BroadcastJob).where(BroadcastJob.id == job_id)
             )

@@ -4,11 +4,11 @@ from typing import Optional
 
 from sqlalchemy import delete, select, update
 
+from bot.database import models
 from bot.database.models import (
     Referral,
     ReferralLink,
     User,
-    async_session,
 )
 
 
@@ -18,7 +18,7 @@ class ReferralRepository:
     @staticmethod
     async def create(user_id: int, invite_link: str) -> ReferralLink:
         """Создать реферальную ссылку."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             referral = ReferralLink(user_id=user_id, invite_link=invite_link)
             session.add(referral)
             await session.commit()
@@ -28,7 +28,7 @@ class ReferralRepository:
     @staticmethod
     async def get_by_user_id(user_id: int) -> Optional[ReferralLink]:
         """Получить реферальную ссылку пользователя."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(ReferralLink).where(ReferralLink.user_id == user_id)
             )
@@ -37,7 +37,7 @@ class ReferralRepository:
     @staticmethod
     async def get_by_invite_link(invite_link: str) -> Optional[ReferralLink]:
         """Найти запись по ссылке."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(ReferralLink).where(ReferralLink.invite_link == invite_link)
             )
@@ -46,7 +46,7 @@ class ReferralRepository:
     @staticmethod
     async def increment_count(referral_id: int) -> None:
         """Увеличить счётчик рефералов."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             await session.execute(
                 update(ReferralLink)
                 .where(ReferralLink.id == referral_id)
@@ -57,7 +57,7 @@ class ReferralRepository:
     @staticmethod
     async def decrement_count(referral_id: int) -> None:
         """Уменьшить счётчик рефералов (при выходе)."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             await session.execute(
                 update(ReferralLink)
                 .where(ReferralLink.id == referral_id)
@@ -69,7 +69,7 @@ class ReferralRepository:
     @staticmethod
     async def get_user_by_invite_link(invite_link: str) -> Optional[User]:
         """Получить владельца ссылки."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(User)
                 .join(ReferralLink)
@@ -80,7 +80,7 @@ class ReferralRepository:
     @staticmethod
     async def claim_gift(referral_id: int, count: int = 1) -> None:
         """Увеличить счётчик полученных подарков."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             await session.execute(
                 update(ReferralLink)
                 .where(ReferralLink.id == referral_id)
@@ -101,7 +101,7 @@ class ReferralRepository:
         if referrals_per_gift <= 0:
             return 0
 
-        async with async_session() as session:
+        async with models.async_session() as session:
             for _ in range(5):
                 result = await session.execute(
                     select(ReferralLink.referral_count, ReferralLink.gifts_claimed)
@@ -133,7 +133,7 @@ class ReferralRepository:
     @staticmethod
     async def add_referral(referral_link_id: int, telegram_id: int) -> None:
         """Добавить запись о реферале."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(Referral).where(
                     Referral.referral_link_id == referral_link_id,
@@ -151,7 +151,7 @@ class ReferralRepository:
         Удалить запись о реферале (при выходе из канала).
         Возвращает ID реферальной ссылки, если был найден и удалён.
         """
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(Referral).where(Referral.telegram_id == telegram_id)
             )

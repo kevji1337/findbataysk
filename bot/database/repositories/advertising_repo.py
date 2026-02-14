@@ -5,7 +5,8 @@ from typing import Optional
 
 from sqlalchemy import func, select, update
 
-from bot.database.models import AdvertisingRequest, User, async_session
+from bot.database import models
+from bot.database.models import AdvertisingRequest, User
 
 
 class AdvertisingRepository:
@@ -14,7 +15,7 @@ class AdvertisingRepository:
     @staticmethod
     async def create(user_id: int, channel_link: str) -> AdvertisingRequest:
         """Создать заявку на рекламу."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             request = AdvertisingRequest(user_id=user_id, channel_link=channel_link)
             session.add(request)
             await session.commit()
@@ -24,7 +25,7 @@ class AdvertisingRepository:
     @staticmethod
     async def get_by_id(request_id: int) -> Optional[AdvertisingRequest]:
         """Получить заявку по ID."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(AdvertisingRequest).where(AdvertisingRequest.id == request_id)
             )
@@ -37,7 +38,7 @@ class AdvertisingRepository:
 
         Возвращает True, если статус реально изменён.
         """
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 update(AdvertisingRequest)
                 .where(AdvertisingRequest.id == request_id)
@@ -56,7 +57,7 @@ class AdvertisingRepository:
         status_filter: Optional[str] = None,
     ) -> list[tuple[AdvertisingRequest, User]]:
         """Получить историю заявок с информацией о пользователях."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             query = (
                 select(AdvertisingRequest, User)
                 .join(User)
@@ -72,7 +73,7 @@ class AdvertisingRepository:
     @staticmethod
     async def get_pending_count() -> int:
         """Получить количество ожидающих заявок."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(func.count(AdvertisingRequest.id))
                 .where(AdvertisingRequest.status == "pending")
@@ -82,7 +83,7 @@ class AdvertisingRepository:
     @staticmethod
     async def get_user_requests_count(user_id: int, hours: int = 1) -> int:
         """Получить количество заявок пользователя за последние N часов."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
             result = await session.execute(
                 select(func.count(AdvertisingRequest.id))

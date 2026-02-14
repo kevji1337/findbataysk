@@ -4,7 +4,8 @@ from typing import Optional
 
 from sqlalchemy import select
 
-from bot.database.models import AdminActionLog, async_session
+from bot.database import models
+from bot.database.models import AdminActionLog
 
 
 class AdminActionLogRepository:
@@ -19,7 +20,7 @@ class AdminActionLogRepository:
         details: Optional[str] = None,
     ) -> AdminActionLog:
         """Записать событие в журнал."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             log = AdminActionLog(
                 admin_telegram_id=admin_telegram_id,
                 action_type=action_type,
@@ -35,7 +36,7 @@ class AdminActionLogRepository:
     @staticmethod
     async def get_recent(limit: int = 50) -> list[AdminActionLog]:
         """Получить последние события журнала."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(AdminActionLog)
                 .order_by(AdminActionLog.created_at.desc())

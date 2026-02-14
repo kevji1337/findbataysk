@@ -73,6 +73,10 @@ async def test_cmd_start_no_photo():
     message.from_user.id = 12345
     message.from_user.username = "test"
     message.from_user.first_name = "Test"
+
+    # Важно: get_or_create асинхронный
+    MockUserRepo.get_or_create = AsyncMock()
+
     message.answer_photo = AsyncMock()
     message.answer = AsyncMock()
     state = AsyncMock(spec=FSMContext)

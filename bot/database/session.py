@@ -5,7 +5,7 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.database.models import async_session
+from bot.database import models
 
 
 @asynccontextmanager
@@ -22,7 +22,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             await ReferralRepository.increment_count(session, ref_id)
             # Всё в одной транзакции!
     """
-    async with async_session() as session:
+    async with models.async_session() as session:
         try:
             yield session
             await session.commit()

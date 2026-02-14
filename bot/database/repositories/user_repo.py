@@ -5,7 +5,8 @@ from typing import Optional
 
 from sqlalchemy import select, update
 
-from bot.database.models import User, async_session
+from bot.database import models
+from bot.database.models import User
 
 
 class UserRepository:
@@ -18,7 +19,7 @@ class UserRepository:
         first_name: Optional[str] = None,
     ) -> User:
         """Получить или создать пользователя."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(User).where(User.telegram_id == telegram_id)
             )
@@ -54,7 +55,7 @@ class UserRepository:
     @staticmethod
     async def get_by_telegram_id(telegram_id: int) -> Optional[User]:
         """Получить пользователя по Telegram ID."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(User).where(User.telegram_id == telegram_id)
             )
@@ -63,21 +64,21 @@ class UserRepository:
     @staticmethod
     async def get_by_id(user_id: int) -> Optional[User]:
         """Получить пользователя по внутреннему ID."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(select(User).where(User.id == user_id))
             return result.scalar_one_or_none()
 
     @staticmethod
     async def get_all_telegram_ids() -> list[int]:
         """Получить Telegram ID всех пользователей."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(select(User.telegram_id))
             return list(result.scalars().all())
 
     @staticmethod
     async def get_broadcast_telegram_ids() -> list[int]:
         """Получить пользователей для рассылки (исключая bot_blocked)."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             result = await session.execute(
                 select(User.telegram_id).where(User.bot_blocked.is_(False))
             )
@@ -86,7 +87,7 @@ class UserRepository:
     @staticmethod
     async def mark_bot_blocked(telegram_id: int) -> None:
         """Пометить пользователя как заблокировавшего бота."""
-        async with async_session() as session:
+        async with models.async_session() as session:
             await session.execute(
                 update(User)
                 .where(User.telegram_id == telegram_id)

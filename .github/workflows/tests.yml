@@ -26,5 +26,7 @@ jobs:
 
     - name: Run Tests with pytest
       run: |
-        # Запускаем все тесты
-        pytest
+        # Проверяем установленные пакеты (для отладки)
+        pip list
+        # Запускаем тесты через модуль python
+        python -m pytest

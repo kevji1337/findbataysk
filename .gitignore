@@ -35,3 +35,13 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Supabase VPS data (не коммитить!)
+supabase-docker/
+
+# Test artifacts
+.pytest_cache/
+*.csv
+
+# Extra venvs
+.venv_new/

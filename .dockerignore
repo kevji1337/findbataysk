@@ -1,0 +1,61 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.gemini/
+
+# Databases (local dev only)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment (secrets — передаются через docker-compose)
+.env
+.env.*
+!.env.example
+
+# Tests & docs (не нужны в продакшн-образе)
+tests/
+loadtests/
+docs/
+scripts/
+*.csv
+
+# Docker (не копировать внутрь образа)
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Logs & coverage
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+
+# CI
+.github/

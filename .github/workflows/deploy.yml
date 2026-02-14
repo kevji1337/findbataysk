@@ -1,0 +1,51 @@
+﻿name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (branch/tag/commit)"
+        required: true
+        default: "main"
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.PROD_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+        run: |
+          ssh "${PROD_USER}@${PROD_HOST}" "
+            set -e
+            cd ${PROD_APP_DIR}
+            git fetch --all --tags
+            git checkout ${{ github.event.inputs.ref || github.ref_name }}
+
+            # Остановить бота перед обновлением
+            docker compose stop bot
+
+            # Пересобрать и запустить (entrypoint.sh выполнит миграции)
+            docker compose up -d --build
+          "

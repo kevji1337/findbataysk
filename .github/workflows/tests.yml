@@ -25,6 +25,13 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Run Tests with pytest
+      env:
+        BOT_TOKEN: "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        CHANNEL_ID: "-1001234567890"
+        ADMIN_IDS: "12345678,87654321"
+        DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/testdb"
+        REDIS_URL: "redis://localhost:6379/0"
+        POSTGRES_PASSWORD: "testpassword"
       run: |
         # Проверяем установленные пакеты (для отладки)
         python -m pip list

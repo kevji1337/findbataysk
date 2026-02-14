@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     broadcast_max_retries: int = 3
     broadcast_worker_poll_seconds: float = 1.0
 
+    # Порт для Healthcheck сервера (полезно для PaaS/Docker)
+    port: int = Field(default=8080, alias="PORT")
+
     # Критерии для рекламы
     ad_criteria: str = """📋 Минимальные критерии для рекламы в Вашем ТГК:
 

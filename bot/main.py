@@ -11,6 +11,7 @@ from bot.config import settings
 from bot.handlers import admin, admin_contact, advertising, leaderboard, referral, start
 from bot.middlewares.rate_limit import rate_limiter
 from bot.services.broadcast_worker import BroadcastWorker
+from bot.services.health import start_healthcheck, stop_healthcheck
 
 
 
@@ -40,6 +41,9 @@ async def main() -> None:
 
     # Startup / Shutdown logic
     async def on_startup(dispatcher: Dispatcher) -> None:
+        logger.info("Starting up...")
+        
+        # 1. Start BroadcastWorker
         logger.info("Starting broadcast worker...")
         worker = BroadcastWorker(
             bot=bot,
@@ -49,15 +53,29 @@ async def main() -> None:
         # Сохраняем worker в workflow_data, чтобы достать при shutdown
         dispatcher["broadcast_worker"] = worker
         
+        # 2. Start Healthcheck Server
+        try:
+            runner = await start_healthcheck()
+            dispatcher["healthcheck_runner"] = runner
+        except Exception as e:
+            logger.error(f"Healthcheck server failed to start: {e}")
+
         logger.info("Bot started")
         logger.info(f"Configured admins: {len(settings.admin_ids)}")
 
     async def on_shutdown(dispatcher: Dispatcher) -> None:
         logger.info("Bot shutdown...")
+        
+        # 1. Stop components
         worker: BroadcastWorker | None = dispatcher.get("broadcast_worker")
         if worker:
             await worker.stop()
+
+        health_runner = dispatcher.get("healthcheck_runner")
+        if health_runner:
+            await stop_healthcheck(health_runner)
         
+        # 2. Close resources
         await storage.close()
         await bot.session.close()
         logger.info("Bot stopped")

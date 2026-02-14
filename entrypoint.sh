@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
-echo "⏳ Waiting for database..."
-until pg_isready -h db -U postgres -q; do
+# Хост БД: supabase-db (контейнер из стека Supabase на VPS)
+DB_HOST="${DB_HOST:-supabase-db}"
+
+echo "⏳ Waiting for database ($DB_HOST)..."
+until pg_isready -h "$DB_HOST" -U postgres -q; do
   sleep 1
 done
 echo "✅ Database is ready"

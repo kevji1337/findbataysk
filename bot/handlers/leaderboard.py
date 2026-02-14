@@ -4,6 +4,7 @@ from aiogram import Router, types
 from aiogram.exceptions import TelegramBadRequest
 from loguru import logger
 
+from bot.database.models import User
 from bot.database.repository import ReferralStatsRepository
 from bot.keyboards.inline import get_leaderboard_keyboard
 
@@ -30,17 +31,15 @@ def _is_message_not_modified_error(exc: TelegramBadRequest) -> bool:
     return "message is not modified" in str(exc).lower()
 
 
-def _format_user_display(user: "object") -> str:
-    """Сформировать отображаемое имя пользователя для лидерборда."""
-    username = getattr(user, "username", None)
-    first_name = getattr(user, "first_name", None)
-    telegram_id = getattr(user, "telegram_id", None)
 
-    if username:
-        return f"@{username}"
-    if first_name:
-        return f"{first_name} (ID:{telegram_id})"
-    return f"ID:{telegram_id}"
+
+def _format_user_display(user: User) -> str:
+    """Сформировать отображаемое имя пользователя для лидерборда."""
+    if user.username:
+        return f"@{user.username}"
+    if user.first_name:
+        return f"{user.first_name} (ID:{user.telegram_id})"
+    return f"ID:{user.telegram_id}"
 
 
 async def _render_leaderboard(

@@ -26,7 +26,6 @@ services:
     restart: unless-stopped
     networks:
       - findbataysk_network
-      - supabase_default
     volumes:
       - ./bot/media:/app/bot/media
 
@@ -37,6 +36,3 @@ volumes:
 networks:
   findbataysk_network:
     driver: bridge
-  # Подключение к сети Supabase для доступа к его PostgreSQL
-  supabase_default:
-    external: true

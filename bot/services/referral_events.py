@@ -102,11 +102,12 @@ async def handle_referral_join(
                 status="joined",
                 is_counted=True,
             )
-            .on_conflict_do_nothing(index_elements=["telegram_id"])
+            .on_conflict_do_nothing(index_elements=["referral_link_id", "telegram_id"])
         )
         result = await session.execute(insert_stmt)
 
         if result.rowcount and result.rowcount > 0:
+            # Начисляем, только если это реально новая запись для ЭТОЙ ссылки
             await session.execute(
                 update(ReferralLink)
                 .where(ReferralLink.id == referral_link.id)
@@ -127,22 +128,20 @@ async def handle_referral_join(
             counted = True
 
         else:
-            event = await session.scalar(
-                select(ReferralEvent).where(ReferralEvent.telegram_id == telegram_id)
+            # Обновляем существующую запись для этой ссылки
+            await session.execute(
+                update(ReferralEvent)
+                .where(ReferralEvent.telegram_id == telegram_id)
+                .where(ReferralEvent.referral_link_id == referral_link.id)
+                .values(last_join_at=now, status="joined")
             )
-            if event:
-                await session.execute(
-                    update(ReferralEvent)
-                    .where(ReferralEvent.id == event.id)
-                    .values(last_join_at=now, status="joined")
-                )
-                _log_activity(
-                    session=session,
-                    telegram_id=telegram_id,
-                    referral_link_id=event.referral_link_id,
-                    action="join",
-                    is_rejoin=True,
-                )
+            _log_activity(
+                session=session,
+                telegram_id=telegram_id,
+                referral_link_id=referral_link.id,
+                action="join",
+                is_rejoin=True,
+            )
 
         owner_telegram_id = await session.scalar(
             select(User.telegram_id).where(User.id == referral_link.user_id)

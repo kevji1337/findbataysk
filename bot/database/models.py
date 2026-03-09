@@ -72,7 +72,7 @@ class Referral(Base):
 
 
 class ReferralEvent(Base):
-    """РЎРѕР±С‹С‚РёСЏ СЂРµС„РµСЂР°Р»Р°: РїРµСЂРІС‹Р№ РІС…РѕРґ, РїРѕРІС‚РѕСЂРЅС‹Р№ РІС…РѕРґ, РІС‹С…РѕРґ."""
+    """События реферала: первый вход, повторный вход, выход."""
 
     __tablename__ = "referral_events"
 
@@ -80,7 +80,7 @@ class ReferralEvent(Base):
     referral_link_id: Mapped[int] = mapped_column(
         ForeignKey("referral_links.id", ondelete="CASCADE")
     )
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
     first_join_at: Mapped[datetime] = mapped_column(server_default=func.now())
     last_join_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     left_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)

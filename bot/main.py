@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 
 
 from aiogram import Bot, Dispatcher
@@ -83,7 +83,17 @@ async def main() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    # 1. Сбрасываем вебхук перед запуском polling
+    # Это критично, если ранее использовались Edge Functions или другой режим
+    logger.info("Deleteting any existing webhooks...")
+    await bot.delete_webhook(drop_pending_updates=True)
+
+    logger.info("Starting polling...")
+    try:
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    except Exception as e:
+        logger.exception(f"Critical error during polling: {e}")
+        raise
 
 
 if __name__ == "__main__":

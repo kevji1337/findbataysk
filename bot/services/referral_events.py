@@ -93,6 +93,12 @@ async def handle_referral_join(
         now = datetime.now(UTC).replace(tzinfo=None)
         counted = False
 
+        # Проверяем, заходил ли этот пользователь КОГДА-ЛИБО через ЛЮБУЮ реферальную ссылку
+        existing_any = await session.scalar(
+            select(ReferralEvent.id).where(ReferralEvent.telegram_id == telegram_id).limit(1)
+        )
+        is_new_user = existing_any is None
+
         insert_stmt = (
             pg_insert(ReferralEvent)
             .values(
@@ -100,33 +106,35 @@ async def handle_referral_join(
                 telegram_id=telegram_id,
                 last_join_at=now,
                 status="joined",
-                is_counted=True,
+                is_counted=is_new_user,
             )
             .on_conflict_do_nothing(index_elements=["referral_link_id", "telegram_id"])
         )
         result = await session.execute(insert_stmt)
 
         if result.rowcount and result.rowcount > 0:
-            # Начисляем, только если это реально новая запись для ЭТОЙ ссылки
-            await session.execute(
-                update(ReferralLink)
-                .where(ReferralLink.id == referral_link.id)
-                .values(referral_count=ReferralLink.referral_count + 1)
-            )
+            # Новая запись для ЭТОЙ ссылки
+            if is_new_user:
+                # Только если юзер реально новый для всей системы
+                await session.execute(
+                    update(ReferralLink)
+                    .where(ReferralLink.id == referral_link.id)
+                    .values(referral_count=ReferralLink.referral_count + 1)
+                )
+                await _increment_daily_stat(
+                    session=session,
+                    owner_user_id=referral_link.user_id,
+                    stat_date=now.date(),
+                )
+                counted = True
+
             _log_activity(
                 session=session,
                 telegram_id=telegram_id,
                 referral_link_id=referral_link.id,
                 action="join",
-                is_rejoin=False,
+                is_rejoin=not is_new_user,
             )
-            await _increment_daily_stat(
-                session=session,
-                owner_user_id=referral_link.user_id,
-                stat_date=now.date(),
-            )
-            counted = True
-
         else:
             # Обновляем существующую запись для этой ссылки
             await session.execute(

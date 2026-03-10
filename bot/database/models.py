@@ -75,6 +75,9 @@ class ReferralEvent(Base):
     """События реферала: первый вход, повторный вход, выход."""
 
     __tablename__ = "referral_events"
+    __table_args__ = (
+        UniqueConstraint("referral_link_id", "telegram_id", name="uq_referral_events_link_id_tg_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     referral_link_id: Mapped[int] = mapped_column(

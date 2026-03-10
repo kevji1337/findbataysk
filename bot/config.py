@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     admin_id: int = 0
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    redis_password: Optional[str] = Field(default=None, alias="REDIS_PASSWORD")
     broadcast_throttle_seconds: float = 0.05
     broadcast_max_retries: int = 3
     broadcast_worker_poll_seconds: float = 1.0
@@ -59,7 +60,7 @@ class Settings(BaseSettings):
         return str(v)
 
     @model_validator(mode="after")
-    def build_admin_ids(self) -> "Settings":
+    def build_config(self) -> "Settings":
         """Собираем финальный список admin_ids."""
         ids: List[int] = []
 
@@ -83,6 +84,11 @@ class Settings(BaseSettings):
         # Sync legacy field
         if self.admin_ids and not self.admin_id:
             self.admin_id = self.admin_ids[0]
+
+        # 2. Инжектим пароль в Redis URL, если он есть
+        if self.redis_password and "@" not in self.redis_url:
+            # Формат: redis://:password@host:port/db
+            self.redis_url = self.redis_url.replace("redis://", f"redis://:{self.redis_password}@")
 
         return self
 

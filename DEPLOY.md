@@ -1,6 +1,65 @@
-# 🚀 Деплой на VPS
+# 🚀 Деплой
 
-## Требования к VPS
+## Coolify
+
+### Что создать
+
+В Coolify нужны:
+- `Application` из этого репозитория
+- `PostgreSQL` сервис
+- `Redis` сервис
+
+### Build / Start
+
+- Тип: `Dockerfile`
+- Dockerfile path: `./Dockerfile`
+- Port: `8080`
+
+Стартовая команда отдельно не нужна: контейнер использует `entrypoint.sh`.
+
+### Переменные окружения приложения
+
+Обязательные:
+
+| Переменная | Пример |
+|------------|--------|
+| `BOT_TOKEN` | `123456:AA...` |
+| `CHANNEL_ID` | `-1001234567890` |
+| `ADMIN_IDS` | `123456789,987654321` |
+| `DATABASE_URL` | `postgresql+asyncpg://user:pass@postgres:5432/dbname` |
+| `REDIS_URL` | `redis://redis:6379/0` |
+
+Опциональные:
+
+| Переменная | Значение по умолчанию |
+|------------|------------------------|
+| `REDIS_PASSWORD` | пусто |
+| `PORT` | `8080` |
+| `DROP_PENDING_UPDATES_ON_STARTUP` | `false` |
+| `RESTORE_BACKUP_MODE` | `never` |
+| `RESTORE_BACKUP_PATH` | `/app/public.backup` |
+| `RESTORE_BACKUP_SCHEMA` | `public` |
+
+### Как залить `public.backup`
+
+Если нужно один раз поднять проект из дампа:
+1. Подключи `public.backup` в контейнер как file mount или volume по пути `/app/public.backup`.
+2. Установи `RESTORE_BACKUP_MODE=if_empty`.
+3. Запусти деплой.
+4. После первого успешного старта переключи `RESTORE_BACKUP_MODE=never`.
+
+При таком режиме backup восстановится только если schema `public` пустая.
+
+### Проверка после деплоя
+
+- В логах должно быть: `Database is ready`
+- Затем: `Running migrations`
+- Если включён restore: `Backup restored`
+- Затем: `Starting bot`
+
+## Ручной деплой на VPS
+
+### Требования к VPS
 
 - Ubuntu 22.04+ (или любой Linux с Docker)
 - Docker + Docker Compose
@@ -45,7 +104,9 @@ nano .env
 | `BOT_TOKEN` | @BotFather → `/newbot` |
 | `CHANNEL_ID` | Переслать пост из канала боту @userinfobot |
 | `ADMIN_IDS` | Отправить `/start` боту @userinfobot |
-| `POSTGRES_PASSWORD` | Придумать сложный пароль |
+| `DATABASE_URL` | Строка подключения к внешнему Postgres |
+| `REDIS_URL` | Строка подключения к Redis |
+| `RESTORE_BACKUP_MODE` | `if_empty`, если нужно один раз залить `public.backup` |
 
 ### 4. Запустить
 
@@ -53,12 +114,19 @@ nano .env
 docker compose up -d
 ```
 
+Если нужно восстановить существующую базу из `public.backup`, выставь в `.env`:
+
+```bash
+RESTORE_BACKUP_MODE=if_empty
+```
+
+После первого успешного старта обязательно верни значение на `never`, чтобы backup не накатывался повторно.
+
 Готово! Бот:
-1. Поднимет PostgreSQL
-2. Поднимет Redis
-3. Дождётся готовности БД
-4. Применит миграции
-5. Запустится
+1. Поднимет Redis
+2. Дождётся готовности БД
+3. Применит миграции
+4. Запустится
 
 ### 5. Проверить
 
@@ -127,9 +195,9 @@ docker compose logs bot
 - `CHANNEL_ID` начинается с `-100`?
 
 ### БД не запускается
-База данных работает в отельном стеке Supabase. Проверьте статус контейнеров Supabase:
+Проверьте строку подключения и доступность Postgres:
 ```bash
-docker ps | grep supabase
+docker compose logs db
 ```
 
 ## 🔐 Безопасность
@@ -137,6 +205,6 @@ docker ps | grep supabase
 **Критически важно:**
 1. Никогда не коммитить `.env` файл.
 2. Регулярно обновлять `BOT_TOKEN` через @BotFather, если есть подозрение на утечку.
-3. Использовать сложные пароли для `POSTGRES_PASSWORD`.
+3. Использовать отдельные учётные данные для Postgres и Redis.
 4. Бэкапы базы данных хранить в безопасном месте, не в web-root.
 

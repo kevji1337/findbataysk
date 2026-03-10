@@ -1,6 +1,7 @@
 """Background worker for persisted broadcast jobs."""
 
 import asyncio
+import json
 from typing import Optional
 
 from aiogram import Bot
@@ -22,6 +23,11 @@ class BroadcastWorker:
     async def start(self) -> None:
         if self._task and not self._task.done():
             return
+
+        requeued = await BroadcastJobRepository.requeue_processing_jobs()
+        if requeued:
+            logger.warning("broadcast_worker_requeued_jobs count={}", requeued)
+
         self._stopped.clear()
         self._task = asyncio.create_task(self._run_loop(), name="broadcast-worker")
         logger.info("broadcast_worker_started")
@@ -56,8 +62,15 @@ class BroadcastWorker:
             return
 
         try:
-            all_user_ids = await UserRepository.get_broadcast_telegram_ids()
-            start_offset = max(0, job.processed_users)
+            if job.recipient_ids_json:
+                try:
+                    all_user_ids = [int(item) for item in json.loads(job.recipient_ids_json)]
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    all_user_ids = await UserRepository.get_broadcast_telegram_ids()
+            else:
+                all_user_ids = await UserRepository.get_broadcast_telegram_ids()
+
+            start_offset = max(0, int(job.processed_users))
             remaining_user_ids = all_user_ids[start_offset:]
 
             for user_id in remaining_user_ids:
@@ -89,6 +102,9 @@ class BroadcastWorker:
 
             await BroadcastJobRepository.mark_done(job.id)
             await self._notify_admin_done(job.id)
+        except asyncio.CancelledError:
+            await BroadcastJobRepository.mark_interrupted(job.id)
+            raise
         except Exception as e:
             await BroadcastJobRepository.mark_retry_or_failed(job.id, str(e))
             logger.exception("broadcast_job_failed job_id={}: {}", job.id, e)

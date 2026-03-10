@@ -80,7 +80,9 @@ class UserRepository:
         """Получить пользователей для рассылки (исключая bot_blocked)."""
         async with models.async_session() as session:
             result = await session.execute(
-                select(User.telegram_id).where(User.bot_blocked.is_(False))
+                select(User.telegram_id)
+                .where(User.bot_blocked.is_(False))
+                .order_by(User.id.asc())
             )
             return list(result.scalars().all())
 

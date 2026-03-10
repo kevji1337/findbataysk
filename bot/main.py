@@ -24,6 +24,7 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
+    logger.info(f"Connecting to Redis: {settings.masked_redis_url}")
     storage = RedisStorage.from_url(settings.redis_url)
     dp = Dispatcher(storage=storage)
 
@@ -83,10 +84,15 @@ async def main() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # 1. Сбрасываем вебхук перед запуском polling
-    # Это критично, если ранее использовались Edge Functions или другой режим
-    logger.info("Deleting any existing webhooks...")
-    await bot.delete_webhook(drop_pending_updates=True)
+    # Сбрасываем вебхук перед запуском polling.
+    # По умолчанию не дропаем pending updates, чтобы не терять join/callback события после рестарта.
+    logger.info(
+        "Deleting any existing webhooks (drop_pending_updates={})...",
+        settings.drop_pending_updates_on_startup,
+    )
+    await bot.delete_webhook(
+        drop_pending_updates=settings.drop_pending_updates_on_startup
+    )
 
     logger.info("Starting polling...")
     try:

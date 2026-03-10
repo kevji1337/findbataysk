@@ -1,4 +1,6 @@
-﻿"""Админ-панель: статистика, история заявок и рассылка."""
+"""Админ-панель: статистика, история заявок и рассылка."""
+
+from datetime import UTC, datetime, timedelta
 
 from aiogram import Bot, Router, types
 from aiogram.exceptions import TelegramBadRequest
@@ -7,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from loguru import logger
 
 from bot.config import settings
+from bot.core.formatting import format_user_model
 from bot.database.repository import (
     AdminActionLogRepository,
     AdvertisingRepository,
@@ -17,6 +20,7 @@ from bot.database.repository import (
 from bot.keyboards.inline import (
     get_admin_panel_keyboard,
     get_back_to_admin_keyboard,
+    get_broadcast_confirm_keyboard,
     get_cancel_keyboard,
     get_requests_filter_keyboard,
 )
@@ -24,9 +28,30 @@ from bot.states.admin_broadcast import AdminBroadcastStates
 
 router = Router(name="admin")
 
-# ── Фильтр: ВСЕ хендлеры этого роутера доступны только админам ──
+# Все хендлеры этого роутера доступны только админам.
 router.message.filter(lambda msg: settings.is_admin(msg.from_user.id))
 router.callback_query.filter(lambda cb: settings.is_admin(cb.from_user.id))
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _is_private_chat(chat: types.Chat | None) -> bool:
+    return getattr(chat, "type", None) == "private"
+
+
+def _is_draft_expired(created_at_raw: str | None) -> bool:
+    if not created_at_raw:
+        return True
+
+    try:
+        created_at = datetime.fromisoformat(created_at_raw)
+    except ValueError:
+        return True
+
+    ttl = max(1, int(settings.broadcast_draft_ttl_seconds))
+    return _utcnow() - created_at > timedelta(seconds=ttl)
 
 
 def _get_admin_panel_text(stats: dict, pending_count: int) -> str:
@@ -63,8 +88,6 @@ async def admin_panel_callback(callback: types.CallbackQuery) -> None:
 
     await callback.answer()
 
-
-from bot.core.formatting import format_user_model
 
 @router.callback_query(lambda c: c.data == "admin_top_referrers")
 async def show_top_referrers(callback: types.CallbackQuery) -> None:
@@ -132,11 +155,17 @@ async def show_requests_history(callback: types.CallbackQuery) -> None:
 @router.callback_query(lambda c: c.data == "admin_broadcast")
 async def admin_broadcast_start(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Запуск админ-рассылки из главного меню."""
+    if not _is_private_chat(callback.message.chat if callback.message else None):
+        await state.clear()
+        await callback.answer("Откройте бота в личных сообщениях", show_alert=True)
+        return
+
     await state.set_state(AdminBroadcastStates.waiting_message)
+    await state.update_data(broadcast_started_at=_utcnow().isoformat())
 
     text = (
         "📣 <b>Рассылка пользователям</b>\n\n"
-        "Отправьте одно сообщение (текст/фото/видео), и я разошлю его всем пользователям бота."
+        "Отправьте одно сообщение (текст/фото/видео), затем отдельно подтвердите запуск рассылки."
     )
     try:
         await callback.message.edit_text(text=text, reply_markup=get_cancel_keyboard())
@@ -148,43 +177,102 @@ async def admin_broadcast_start(callback: types.CallbackQuery, state: FSMContext
 
 @router.message(AdminBroadcastStates.waiting_message)
 async def admin_broadcast_send(message: types.Message, state: FSMContext, bot: Bot) -> None:
-    """Поставить сообщение в очередь фоновой рассылки."""
+    """Принять сообщение для рассылки и запросить подтверждение."""
+    del bot
+
+    if not settings.is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("⛔ Доступ запрещён.")
+        return
+
+    if not _is_private_chat(message.chat):
+        await state.clear()
+        await message.answer("Рассылку можно запускать только из личного чата с ботом.")
+        return
+
+    state_data = await state.get_data()
+    if _is_draft_expired(state_data.get("broadcast_started_at")):
+        await state.clear()
+        await message.answer(
+            "Черновик рассылки истёк. Откройте раздел рассылки заново."
+        )
+        return
+
+    await state.update_data(
+        broadcast_source_chat_id=message.chat.id,
+        broadcast_source_message_id=message.message_id,
+        broadcast_started_at=_utcnow().isoformat(),
+    )
+    await state.set_state(AdminBroadcastStates.waiting_confirmation)
+
+    await message.answer(
+        "Сообщение сохранено. Подтвердите запуск рассылки ниже.",
+        reply_markup=get_broadcast_confirm_keyboard(),
+    )
+    logger.info("broadcast_draft_saved admin={}", message.from_user.id)
+
+
+@router.callback_query(
+    AdminBroadcastStates.waiting_confirmation,
+    lambda c: c.data == "admin_broadcast_confirm",
+)
+async def admin_broadcast_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Поставить подтверждённую рассылку в очередь."""
+    state_data = await state.get_data()
+    if _is_draft_expired(state_data.get("broadcast_started_at")):
+        await state.clear()
+        await callback.answer("Черновик истёк. Создайте рассылку заново.", show_alert=True)
+        return
+
+    source_chat_id = state_data.get("broadcast_source_chat_id")
+    source_message_id = state_data.get("broadcast_source_message_id")
+    if not source_chat_id or not source_message_id:
+        await state.clear()
+        await callback.answer("Черновик не найден. Создайте рассылку заново.", show_alert=True)
+        return
+
     user_ids = await UserRepository.get_broadcast_telegram_ids()
     if not user_ids:
         await state.clear()
-        await message.answer("Нет пользователей для рассылки.")
+        await callback.message.answer("Нет пользователей для рассылки.")
+        await callback.answer()
         return
 
     job = await BroadcastJobRepository.create(
-        admin_telegram_id=message.from_user.id,
-        source_chat_id=message.chat.id,
-        source_message_id=message.message_id,
+        admin_telegram_id=callback.from_user.id,
+        source_chat_id=int(source_chat_id),
+        source_message_id=int(source_message_id),
         total_users=len(user_ids),
+        recipient_ids=user_ids,
         throttle_seconds=settings.broadcast_throttle_seconds,
         max_retries=settings.broadcast_max_retries,
     )
 
     await AdminActionLogRepository.create(
-        admin_telegram_id=message.from_user.id,
+        admin_telegram_id=callback.from_user.id,
         action_type="broadcast_queued",
         target_type="broadcast_job",
         target_id=job.id,
         details=f"total_users={len(user_ids)}",
     )
 
-    await message.answer(
-        (
-            "📬 <b>Рассылка поставлена в очередь</b>\n\n"
-            f"Job ID: <b>{job.id}</b>\n"
-            f"Пользователей к обработке: <b>{len(user_ids)}</b>\n\n"
-            "Отдельное сообщение придет после завершения."
-        )
-    )
     await state.clear()
 
+    text = (
+        "📬 <b>Рассылка поставлена в очередь</b>\n\n"
+        f"Job ID: <b>{job.id}</b>\n"
+        f"Пользователей к обработке: <b>{len(user_ids)}</b>\n\n"
+        "Отдельное сообщение придет после завершения."
+    )
+    try:
+        await callback.message.edit_text(text)
+    except TelegramBadRequest:
+        await callback.message.answer(text)
+
+    await callback.answer("Рассылка запущена")
     logger.info(
         "broadcast_queued admin={} job_id={} total={}",
-        message.from_user.id,
+        callback.from_user.id,
         job.id,
         len(user_ids),
     )

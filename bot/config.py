@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     broadcast_throttle_seconds: float = 0.05
     broadcast_max_retries: int = 3
     broadcast_worker_poll_seconds: float = 1.0
+    broadcast_draft_ttl_seconds: int = 600
+    drop_pending_updates_on_startup: bool = Field(
+        default=False,
+        alias="DROP_PENDING_UPDATES_ON_STARTUP",
+    )
 
     # Порт для Healthcheck сервера (полезно для PaaS/Docker)
     port: int = Field(default=8080, alias="PORT")
@@ -88,13 +93,27 @@ class Settings(BaseSettings):
 
         # 2. Инжектим пароль в Redis URL, если он есть
         if self.redis_password and "@" not in self.redis_url:
-            # Экранируем пароль (полезно, если в нем есть спецсимволы)
+            # Экранируем пароль
             safe_password = quote(self.redis_password)
-            # Формат: redis://default:password@host:port/db
             # Пытаемся заменить redis:// на redis://default:password@
-            self.redis_url = self.redis_url.replace("redis://", f"redis://default:{safe_password}@")
+            # (используем default: так как Coolify явно указывает его)
+            if "redis://" in self.redis_url:
+                self.redis_url = self.redis_url.replace("redis://", f"redis://default:{safe_password}@")
+            else:
+                self.redis_url = f"redis://default:{safe_password}@{self.redis_url}"
 
         return self
+
+    @property
+    def masked_redis_url(self) -> str:
+        """URL для логов с подмененным паролем."""
+        if "@" in self.redis_url:
+            parts = self.redis_url.split("@")
+            # Пытаемся сохранить схему и хост, но скрыть юзера/пароль
+            prefix = parts[0].split("://")
+            scheme = prefix[0]
+            return f"{scheme}://****:****@{parts[1]}"
+        return self.redis_url
 
     def is_admin(self, user_id: int) -> bool:
         """Проверить, является ли пользователь админом."""

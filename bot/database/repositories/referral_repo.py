@@ -2,7 +2,8 @@
 
 from typing import Optional
 
-from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import case, delete, select, update
 
 from bot.database import models
 from bot.database.models import (
@@ -24,6 +25,34 @@ class ReferralRepository:
             await session.commit()
             await session.refresh(referral)
             return referral
+
+    @staticmethod
+    async def create_or_get_by_user_id(
+        user_id: int,
+        invite_link: str,
+    ) -> tuple[ReferralLink, bool]:
+        """
+        Создать реферальную ссылку или вернуть уже существующую.
+
+        Returns:
+            (referral_link, created_now)
+        """
+        async with models.async_session() as session:
+            referral = ReferralLink(user_id=user_id, invite_link=invite_link)
+            session.add(referral)
+            try:
+                await session.commit()
+                await session.refresh(referral)
+                return referral, True
+            except IntegrityError:
+                await session.rollback()
+                result = await session.execute(
+                    select(ReferralLink).where(ReferralLink.user_id == user_id)
+                )
+                existing = result.scalar_one_or_none()
+                if existing is None:
+                    raise
+                return existing, False
 
     @staticmethod
     async def get_by_user_id(user_id: int) -> Optional[ReferralLink]:
@@ -85,6 +114,25 @@ class ReferralRepository:
                 update(ReferralLink)
                 .where(ReferralLink.id == referral_id)
                 .values(gifts_claimed=ReferralLink.gifts_claimed + count)
+            )
+            await session.commit()
+
+    @staticmethod
+    async def release_claimed_gifts(referral_id: int, count: int) -> None:
+        """Откатить зарезервированные подарки, если заявка не была доставлена админам."""
+        if count <= 0:
+            return
+
+        async with models.async_session() as session:
+            await session.execute(
+                update(ReferralLink)
+                .where(ReferralLink.id == referral_id)
+                .values(
+                    gifts_claimed=case(
+                        (ReferralLink.gifts_claimed >= count, ReferralLink.gifts_claimed - count),
+                        else_=0,
+                    )
+                )
             )
             await session.commit()
 

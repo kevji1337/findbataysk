@@ -28,8 +28,9 @@ cp .env.example .env
 - `BOT_TOKEN` — от @BotFather
 - `CHANNEL_ID` — ID канала (начинается с -100)
 - `ADMIN_IDS` — ID админов через запятую
-- `DATABASE_URL` — ссылка на Postgres (Supabase или локальный)
+- `DATABASE_URL` — ссылка на Postgres
 - `REDIS_URL` — ссылка на Redis
+- `RESTORE_BACKUP_MODE=if_empty` — если нужно один раз восстановить `public.backup` при первом старте
 
 ### 3. Настройка Telegram
 
@@ -41,6 +42,8 @@ cp .env.example .env
 
 ### 4. Запуск в Docker (рекомендуется)
 
+Перед запуском убедись, что `DATABASE_URL` указывает на доступный Postgres.
+
 ```bash
 # Запустить всё (Бот + Redis)
 docker compose up -d
@@ -51,7 +54,7 @@ docker compose logs -f bot
 
 ### 4. Локальная разработка
 
-Если база данных запущена отдельно (например, в Supabase или локально в Docker):
+Если база данных запущена отдельно:
 
 ```bash
 # Применить миграции
@@ -60,6 +63,36 @@ alembic upgrade head
 # Запустить бота
 python -m bot.main
 ```
+
+### Восстановление `public.backup`
+
+Если нужно поднять бота сразу с существующей базой:
+
+```bash
+RESTORE_BACKUP_MODE=if_empty
+```
+
+Контейнер сам дождётся Postgres, восстановит `public.backup` в schema `public`, затем применит миграции. После первого успешного старта верни `RESTORE_BACKUP_MODE=never`.
+
+## Coolify
+
+Для деплоя в Coolify достаточно одного сервиса с этим репозиторием и двух подключённых сервисов:
+- Postgres
+- Redis
+
+Минимальные переменные окружения для приложения:
+- `BOT_TOKEN`
+- `CHANNEL_ID`
+- `ADMIN_IDS`
+- `DATABASE_URL`
+- `REDIS_URL`
+
+Дополнительно:
+- `REDIS_PASSWORD`, если Coolify выдал Redis отдельно от URL
+- `PORT=8080`
+- `RESTORE_BACKUP_MODE=if_empty` только для первого старта с `public.backup`
+
+Если нужен restore из `public.backup`, смонтируй файл в контейнер по пути `/app/public.backup`. После первого успешного старта переключи `RESTORE_BACKUP_MODE=never`.
 
 ## 📁 Структура проекта
 

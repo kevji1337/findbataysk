@@ -134,6 +134,26 @@ def get_cancel_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def get_broadcast_confirm_keyboard() -> InlineKeyboardMarkup:
+    """Подтверждение перед массовой рассылкой."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Запустить рассылку",
+                    callback_data="admin_broadcast_confirm",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Отмена",
+                    callback_data="cancel_action",
+                )
+            ],
+        ]
+    )
+
+
 def get_admin_panel_keyboard() -> InlineKeyboardMarkup:
     """Главное меню админ-панели."""
     return InlineKeyboardMarkup(

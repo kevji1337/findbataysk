@@ -1,75 +1,69 @@
-﻿from types import SimpleNamespace
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from bot.handlers import admin as admin_handler
+from bot.states.admin_broadcast import AdminBroadcastStates
 
 
 @pytest.mark.asyncio
 async def test_admin_broadcast_send_rejects_non_admin(monkeypatch):
     monkeypatch.setattr(type(admin_handler.settings), "is_admin", lambda _self, _uid: False)
-    
-    # Мокаем репозиторий, чтобы не лез в БД, даже если проверка админа сломается
-    monkeypatch.setattr(
-        admin_handler.UserRepository,
-        "get_broadcast_telegram_ids",
-        AsyncMock(return_value=[])
-    )
 
-    clear = AsyncMock()
-    state = SimpleNamespace(clear=clear)
+    state = SimpleNamespace(
+        clear=AsyncMock(),
+        get_data=AsyncMock(return_value={"broadcast_started_at": datetime.now(UTC).replace(tzinfo=None).isoformat()}),
+    )
 
     answer = AsyncMock()
     message = SimpleNamespace(
         from_user=SimpleNamespace(id=111),
-        chat=SimpleNamespace(id=111),
+        chat=SimpleNamespace(id=111, type="private"),
         message_id=10,
         answer=answer,
     )
-    bot = SimpleNamespace(copy_message=AsyncMock())
 
-    await admin_handler.admin_broadcast_send(message=message, state=state, bot=bot)
+    await admin_handler.admin_broadcast_send(message=message, state=state, bot=object())
 
-    clear.assert_awaited_once()
-    bot.copy_message.assert_not_called()
+    state.clear.assert_awaited_once()
     answer.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_admin_broadcast_send_handles_empty_user_list(monkeypatch):
+async def test_admin_broadcast_send_saves_draft_and_requests_confirmation(monkeypatch):
     monkeypatch.setattr(type(admin_handler.settings), "is_admin", lambda _self, _uid: True)
 
-    async def _get_ids() -> list[int]:
-        return []
-
-    monkeypatch.setattr(
-        admin_handler.UserRepository,
-        "get_broadcast_telegram_ids",
-        staticmethod(_get_ids),
+    state = SimpleNamespace(
+        clear=AsyncMock(),
+        get_data=AsyncMock(
+            return_value={
+                "broadcast_started_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+            }
+        ),
+        update_data=AsyncMock(),
+        set_state=AsyncMock(),
     )
-
-    clear = AsyncMock()
-    state = SimpleNamespace(clear=clear)
 
     answer = AsyncMock()
     message = SimpleNamespace(
-        from_user=SimpleNamespace(id=111),
-        chat=SimpleNamespace(id=111),
-        message_id=10,
+        from_user=SimpleNamespace(id=777),
+        chat=SimpleNamespace(id=777, type="private"),
+        message_id=77,
         answer=answer,
     )
-    bot = SimpleNamespace(copy_message=AsyncMock())
 
-    await admin_handler.admin_broadcast_send(message=message, state=state, bot=bot)
+    await admin_handler.admin_broadcast_send(message=message, state=state, bot=object())
 
-    clear.assert_awaited_once()
-    bot.copy_message.assert_not_called()
+    state.clear.assert_not_called()
+    state.update_data.assert_awaited_once()
+    state.set_state.assert_awaited_once_with(AdminBroadcastStates.waiting_confirmation)
     answer.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_admin_broadcast_send_queues_job_and_logs(monkeypatch):
+async def test_admin_broadcast_confirm_queues_job_and_logs(monkeypatch):
     monkeypatch.setattr(type(admin_handler.settings), "is_admin", lambda _self, _uid: True)
 
     async def _get_ids() -> list[int]:
@@ -101,32 +95,34 @@ async def test_admin_broadcast_send_queues_job_and_logs(monkeypatch):
         staticmethod(log_create),
     )
 
-    clear = AsyncMock()
-    state = SimpleNamespace(clear=clear)
-
-    answer = AsyncMock()
-    message = SimpleNamespace(
-        from_user=SimpleNamespace(id=777),
-        chat=SimpleNamespace(id=777),
-        message_id=77,
-        answer=answer,
+    state = SimpleNamespace(
+        clear=AsyncMock(),
+        get_data=AsyncMock(
+            return_value={
+                "broadcast_started_at": datetime.now(UTC).replace(tzinfo=None).isoformat(),
+                "broadcast_source_chat_id": 777,
+                "broadcast_source_message_id": 77,
+            }
+        ),
     )
 
-    bot = SimpleNamespace(copy_message=AsyncMock())
+    callback = SimpleNamespace(
+        data="admin_broadcast_confirm",
+        from_user=SimpleNamespace(id=777),
+        message=SimpleNamespace(
+            edit_text=AsyncMock(),
+            answer=AsyncMock(),
+        ),
+        answer=AsyncMock(),
+    )
 
-    await admin_handler.admin_broadcast_send(message=message, state=state, bot=bot)
+    await admin_handler.admin_broadcast_confirm(callback=callback, state=state)
 
-    bot.copy_message.assert_not_called()
     create_job.assert_awaited_once()
-    clear.assert_awaited_once()
+    kwargs = create_job.await_args.kwargs
+    assert kwargs["recipient_ids"] == [1001, 1002, 1003]
 
     log_create.assert_awaited_once()
-    kwargs = log_create.await_args.kwargs
-    assert kwargs["action_type"] == "broadcast_queued"
-    assert kwargs["target_type"] == "broadcast_job"
-    assert kwargs["target_id"] == 42
-
-    answer.assert_awaited_once()
-    report = answer.await_args.args[0]
-    assert "Job ID: <b>42</b>" in report
-    assert "<b>3</b>" in report
+    state.clear.assert_awaited_once()
+    callback.answer.assert_awaited_once()
+    callback.message.edit_text.assert_awaited_once()

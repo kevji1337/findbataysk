@@ -40,6 +40,7 @@ class ReferralLink(Base):
     """Реферальная ссылка пользователя."""
 
     __tablename__ = "referral_links"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_referral_links_user_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -188,6 +189,7 @@ class BroadcastJob(Base):
     source_chat_id: Mapped[int] = mapped_column(BigInteger)
     source_message_id: Mapped[int] = mapped_column()
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    recipient_ids_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     total_users: Mapped[int] = mapped_column(default=0)
     processed_users: Mapped[int] = mapped_column(default=0)
     sent_count: Mapped[int] = mapped_column(default=0)
@@ -205,12 +207,39 @@ class BroadcastJob(Base):
         onupdate=func.now(),
     )
 
+_engine = None
+_session_factory = None
+_session_factory_url: Optional[str] = None
 
-engine = create_async_engine(settings.database_url, echo=False)
-async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+def get_engine():
+    """Ленивая инициализация engine для лучшей совместимости тестов и окружений."""
+    global _engine, _session_factory, _session_factory_url
+
+    database_url = settings.database_url
+    if _engine is None or _session_factory is None or _session_factory_url != database_url:
+        _engine = create_async_engine(database_url, echo=False)
+        _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+        _session_factory_url = database_url
+    return _engine
+
+
+def get_async_session_factory():
+    get_engine()
+    return _session_factory
+
+
+class AsyncSessionFactoryProxy:
+    """Прокси для совместимости со старым вызовом models.async_session()."""
+
+    def __call__(self, *args, **kwargs):
+        return get_async_session_factory()(*args, **kwargs)
+
+
+async_session = AsyncSessionFactoryProxy()
 
 
 async def init_db() -> None:
     """Инициализация базы данных (создание таблиц)."""
-    async with engine.begin() as conn:
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

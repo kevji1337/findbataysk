@@ -1,5 +1,6 @@
 """Репозиторий фоновых задач рассылки."""
 
+import json
 from datetime import UTC, datetime
 from typing import Optional
 
@@ -19,6 +20,7 @@ class BroadcastJobRepository:
         source_chat_id: int,
         source_message_id: int,
         total_users: int,
+        recipient_ids: Optional[list[int]] = None,
         throttle_seconds: float = 0.05,
         max_retries: int = 3,
     ) -> BroadcastJob:
@@ -28,6 +30,7 @@ class BroadcastJobRepository:
                 source_chat_id=source_chat_id,
                 source_message_id=source_message_id,
                 status="pending",
+                recipient_ids_json=json.dumps(recipient_ids or []),
                 total_users=total_users,
                 throttle_seconds=throttle_seconds,
                 max_retries=max_retries,
@@ -102,6 +105,37 @@ class BroadcastJobRepository:
                 )
             )
             await session.commit()
+
+    @staticmethod
+    async def mark_interrupted(job_id: int, error_text: str = "worker_interrupted") -> None:
+        """Вернуть незавершённую задачу в очередь после штатной остановки worker."""
+        async with models.async_session() as session:
+            await session.execute(
+                update(BroadcastJob)
+                .where(BroadcastJob.id == job_id)
+                .where(BroadcastJob.status == "processing")
+                .values(
+                    status="pending",
+                    last_error=error_text[:4000],
+                )
+            )
+            await session.commit()
+
+    @staticmethod
+    async def requeue_processing_jobs() -> int:
+        """Подобрать зависшие processing-задачи после рестарта процесса."""
+        async with models.async_session() as session:
+            result = await session.execute(
+                update(BroadcastJob)
+                .where(BroadcastJob.status == "processing")
+                .where(BroadcastJob.finished_at.is_(None))
+                .values(
+                    status="pending",
+                    last_error="worker_restarted_before_completion",
+                )
+            )
+            await session.commit()
+            return int(result.rowcount or 0)
 
     @staticmethod
     async def mark_retry_or_failed(job_id: int, error_text: str) -> None:

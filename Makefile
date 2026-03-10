@@ -55,7 +55,7 @@ help:
 	@echo "  make clean          - Очистить кэш Python"
 	@echo ""
 	@echo "Docker команды:"
-	@echo "  make docker-up      - Запустить Supabase Postgres"
+	@echo "  make docker-up      - Запустить Postgres"
 	@echo "  make docker-down    - Остановить контейнеры"
 	@echo "  make docker-logs    - Просмотр логов"
 	@echo "  make docker-db-check - Проверить подключение к БД"

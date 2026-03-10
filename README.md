@@ -72,7 +72,7 @@ python -m bot.main
 RESTORE_BACKUP_MODE=if_empty
 ```
 
-Контейнер сам дождётся Postgres, восстановит `public.backup` в schema `public`, затем применит миграции. После первого успешного старта верни `RESTORE_BACKUP_MODE=never`.
+Контейнер сам дождётся Postgres, восстановит `public.backup` в schema `public`, затем применит миграции. Для custom-format dump policy/RLS-объекты по умолчанию отфильтровываются, чтобы restore не падал на отсутствующих ролях managed Postgres. После первого успешного старта верни `RESTORE_BACKUP_MODE=never`.
 
 ## Coolify
 

@@ -39,6 +39,7 @@
 | `RESTORE_BACKUP_MODE` | `never` |
 | `RESTORE_BACKUP_PATH` | `/app/public.backup` |
 | `RESTORE_BACKUP_SCHEMA` | `public` |
+| `RESTORE_BACKUP_SKIP_OBJECT_TYPES` | `POLICY,ROW SECURITY,ACL,DEFAULT ACL` |
 
 ### Как залить `public.backup`
 

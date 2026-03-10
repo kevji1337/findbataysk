@@ -33,6 +33,7 @@ maybe_restore_backup() {
   local restore_mode="${RESTORE_BACKUP_MODE:-never}"
   local backup_path="${RESTORE_BACKUP_PATH:-/app/public.backup}"
   local restore_schema="${RESTORE_BACKUP_SCHEMA:-public}"
+  local skip_object_types="${RESTORE_BACKUP_SKIP_OBJECT_TYPES:-POLICY,ROW SECURITY,ACL,DEFAULT ACL}"
 
   case "$restore_mode" in
     never)
@@ -67,12 +68,54 @@ maybe_restore_backup() {
 
   echo "⏳ Restoring backup from $backup_path..."
   if [[ "$(head -c 5 "$backup_path" || true)" == "PGDMP" ]]; then
+    local restore_list
+    restore_list="$(mktemp)"
+
+    pg_restore -l "$backup_path" > "$restore_list"
+
+    RESTORE_LIST_PATH="$restore_list" RESTORE_SKIP_OBJECT_TYPES="$skip_object_types" python - <<'PY'
+import os
+import re
+
+list_path = os.environ["RESTORE_LIST_PATH"]
+skip_types = [
+    item.strip()
+    for item in os.environ.get("RESTORE_SKIP_OBJECT_TYPES", "").split(",")
+    if item.strip()
+]
+
+if not skip_types:
+    raise SystemExit(0)
+
+pattern = re.compile(
+    r"(^|[\t ])(?:%s)($|[\t ])" % "|".join(re.escape(item) for item in skip_types),
+    re.IGNORECASE,
+)
+
+with open(list_path, "r", encoding="utf-8", errors="ignore") as src:
+    lines = src.readlines()
+
+with open(list_path, "w", encoding="utf-8") as dst:
+    for line in lines:
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith(";"):
+            dst.write(line)
+            continue
+
+        if pattern.search(line):
+            dst.write(";" + line if not line.startswith(";") else line)
+            continue
+
+        dst.write(line)
+PY
+
     pg_restore \
       --host="$DB_HOST" \
       --port="$DB_PORT" \
       --username="$DB_USER" \
       --dbname="$DB_NAME" \
       --schema="$restore_schema" \
+      --use-list="$restore_list" \
       --clean \
       --if-exists \
       --no-owner \
@@ -80,6 +123,7 @@ maybe_restore_backup() {
       --single-transaction \
       --exit-on-error \
       "$backup_path"
+    rm -f "$restore_list"
   else
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" < "$backup_path"
   fi

@@ -85,7 +85,7 @@ async def main() -> None:
 
     # 1. Сбрасываем вебхук перед запуском polling
     # Это критично, если ранее использовались Edge Functions или другой режим
-    logger.info("Deleteting any existing webhooks...")
+    logger.info("Deleting any existing webhooks...")
     await bot.delete_webhook(drop_pending_updates=True)
 
     logger.info("Starting polling...")

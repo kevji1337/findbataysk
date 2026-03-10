@@ -1,4 +1,5 @@
 from typing import List, Optional, Union
+from urllib.parse import quote
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -87,8 +88,11 @@ class Settings(BaseSettings):
 
         # 2. Инжектим пароль в Redis URL, если он есть
         if self.redis_password and "@" not in self.redis_url:
-            # Формат: redis://:password@host:port/db
-            self.redis_url = self.redis_url.replace("redis://", f"redis://:{self.redis_password}@")
+            # Экранируем пароль (полезно, если в нем есть спецсимволы)
+            safe_password = quote(self.redis_password)
+            # Формат: redis://default:password@host:port/db
+            # Пытаемся заменить redis:// на redis://default:password@
+            self.redis_url = self.redis_url.replace("redis://", f"redis://default:{safe_password}@")
 
         return self
 

@@ -36,26 +36,11 @@
 | `REDIS_PASSWORD` | пусто |
 | `PORT` | `8080` |
 | `DROP_PENDING_UPDATES_ON_STARTUP` | `false` |
-| `RESTORE_BACKUP_MODE` | `never` |
-| `RESTORE_BACKUP_PATH` | `/app/public.backup` |
-| `RESTORE_BACKUP_SCHEMA` | `public` |
-| `RESTORE_BACKUP_SKIP_OBJECT_TYPES` | `POLICY,ROW SECURITY,ACL,DEFAULT ACL` |
-
-### Как залить `public.backup`
-
-Если нужно один раз поднять проект из дампа:
-1. Подключи `public.backup` в контейнер как file mount или volume по пути `/app/public.backup`.
-2. Установи `RESTORE_BACKUP_MODE=if_empty`.
-3. Запусти деплой.
-4. После первого успешного старта переключи `RESTORE_BACKUP_MODE=never`.
-
-При таком режиме backup восстановится только если schema `public` пустая.
 
 ### Проверка после деплоя
 
 - В логах должно быть: `Database is ready`
 - Затем: `Running migrations`
-- Если включён restore: `Backup restored`
 - Затем: `Starting bot`
 
 ## Ручной деплой на VPS
@@ -107,21 +92,12 @@ nano .env
 | `ADMIN_IDS` | Отправить `/start` боту @userinfobot |
 | `DATABASE_URL` | Строка подключения к внешнему Postgres |
 | `REDIS_URL` | Строка подключения к Redis |
-| `RESTORE_BACKUP_MODE` | `if_empty`, если нужно один раз залить `public.backup` |
 
 ### 4. Запустить
 
 ```bash
 docker compose up -d
 ```
-
-Если нужно восстановить существующую базу из `public.backup`, выставь в `.env`:
-
-```bash
-RESTORE_BACKUP_MODE=if_empty
-```
-
-После первого успешного старта обязательно верни значение на `never`, чтобы backup не накатывался повторно.
 
 Готово! Бот:
 1. Поднимет Redis

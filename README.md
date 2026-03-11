@@ -30,7 +30,6 @@ cp .env.example .env
 - `ADMIN_IDS` — ID админов через запятую
 - `DATABASE_URL` — ссылка на Postgres
 - `REDIS_URL` — ссылка на Redis
-- `RESTORE_BACKUP_MODE=if_empty` — если нужно один раз восстановить `public.backup` при первом старте
 
 ### 3. Настройка Telegram
 
@@ -64,16 +63,6 @@ alembic upgrade head
 python -m bot.main
 ```
 
-### Восстановление `public.backup`
-
-Если нужно поднять бота сразу с существующей базой:
-
-```bash
-RESTORE_BACKUP_MODE=if_empty
-```
-
-Контейнер сам дождётся Postgres, восстановит `public.backup` в schema `public`, затем применит миграции. Для custom-format dump policy/RLS-объекты по умолчанию отфильтровываются, чтобы restore не падал на отсутствующих ролях managed Postgres. После первого успешного старта верни `RESTORE_BACKUP_MODE=never`.
-
 ## Coolify
 
 Для деплоя в Coolify достаточно одного сервиса с этим репозиторием и двух подключённых сервисов:
@@ -90,9 +79,6 @@ RESTORE_BACKUP_MODE=if_empty
 Дополнительно:
 - `REDIS_PASSWORD`, если Coolify выдал Redis отдельно от URL
 - `PORT=8080`
-- `RESTORE_BACKUP_MODE=if_empty` только для первого старта с `public.backup`
-
-Если нужен restore из `public.backup`, смонтируй файл в контейнер по пути `/app/public.backup`. После первого успешного старта переключи `RESTORE_BACKUP_MODE=never`.
 
 ## 📁 Структура проекта
 
